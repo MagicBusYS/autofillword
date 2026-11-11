@@ -295,6 +295,23 @@ Nginx `client_max_body_size` 没生效，确认改的是 `sites-enabled` 实际�
 sudo chown -R autofill:autofill /var/lib/autofill
 ```
 
+**6. 更新前端后样式不对 / 按钮位置变了**
+八成是服务器上的 `style.css` 没更新，或浏览器用了旧缓存（旧版 Nginx 配置给 `/assets/` 设了 7 天缓存）。
+
+```bash
+# ① 确认服务器上的文件是新的
+grep -c "confirm-actions" /opt/autofill/public/index.html
+grep -c "confirm-actions" /opt/autofill/public/assets/style.css
+# 两个都应 ≥1；若有一边是 0，说明代码没拉全
+cd /opt/autofill && sudo -u autofill git pull && sudo systemctl restart autofill
+
+# ② 让浏览器强制刷新
+#    Windows: Ctrl + F5（或 Ctrl + Shift + R）
+#    或 F12 打开开发者工具 → Network 勾选 "Disable cache" 后刷新
+```
+
+Nginx 配置已改为 `/assets/` 不缓存（`no-cache` + ETag 协商），避免以后再出现"代码更新了但页面样式没变"。
+
 **7. 想彻底清空服务器数据**
 ```bash
 sudo systemctl stop autofill
