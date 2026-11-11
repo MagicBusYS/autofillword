@@ -1,0 +1,26 @@
+{
+  "name": "autofill-web",
+  "version": "1.0.0",
+  "description": "AI 智能文档填充系统 - 上传 Word/Excel 模板，自动识别填充位置并从知识库匹配内容",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "samples": "node scripts/make-samples.js",
+    "test": "node scripts/e2e-test.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.8.10",
+    "exceljs": "^4.4.0",
+    "express": "^4.19.2",
+    "jszip": "^3.10.1",
+    "multer": "^2.5.0",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "form-data": "^4.0.0"
+  }
+}

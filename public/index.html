@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能文档填充 - 填充工作台</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="logo">📄 智能文档填充</div>
+  <nav>
+    <a href="/" class="active">填充工作台</a>
+    <a href="/knowledge.html">知识库</a>
+    <a href="/settings.html">设置</a>
+  </nav>
+</header>
+
+<main class="container">
+  <h1 class="page-title">填充工作台</h1>
+  <p class="page-desc">上传 Word / Excel 模板，系统自动识别待填充位置，优先从知识库匹配内容，确认后下载成品文件。</p>
+
+  <!-- 步骤 1：上传 -->
+  <div id="step-upload">
+    <div class="card">
+      <h3>① 上传待填充模板</h3>
+      <div class="row mb-16">
+        <div style="flex:1; min-width: 240px;">
+          <label class="field-label">选择知识库档案（匹配填充内容来源）</label>
+          <select id="profile-select">
+            <option value="">不使用知识库</option>
+          </select>
+          <p class="muted mt-8">档案在「知识库」页管理。建议先上传一份已填写完整的文件让系统学习。</p>
+        </div>
+      </div>
+      <div class="upload-zone" id="upload-zone">
+        <div class="icon">📤</div>
+        <div class="main">点击选择或拖拽文件到此处</div>
+        <div class="hint">支持 .docx / .xlsx，单个文件不超过 50MB（.doc / .xls 请先另存为新格式）</div>
+        <input type="file" id="file-input" accept=".docx,.xlsx">
+      </div>
+    </div>
+  </div>
+
+  <!-- 步骤 2：分析中 -->
+  <div id="step-analyzing" style="display:none">
+    <div class="card">
+      <h3>② AI 分析中</h3>
+      <div class="progress-bar mb-16"><div class="fill"></div></div>
+      <p class="muted" id="analyzing-hint">正在解析文档结构、识别填充位置并匹配知识库…</p>
+    </div>
+  </div>
+
+  <!-- 步骤 3：确认 -->
+  <div id="step-confirm" style="display:none">
+    <div class="card">
+      <h3>③ 确认填充内容</h3>
+      <div id="ai-message"></div>
+      <div class="row mb-16" style="justify-content: space-between;">
+        <div class="row">
+          <span class="muted" id="stat-text"></span>
+        </div>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-muted); cursor:pointer;">
+          <input type="checkbox" id="only-fillable" checked> 只显示待填充项
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table id="fields-table">
+          <thead>
+            <tr>
+              <th style="width:36px;"></th>
+              <th>字段</th>
+              <th style="width:90px;">位置</th>
+              <th style="min-width:220px;">填充值（可编辑）</th>
+              <th style="width:110px;">来源</th>
+              <th style="width:80px;">把握</th>
+            </tr>
+          </thead>
+          <tbody id="fields-tbody"></tbody>
+        </table>
+      </div>
+      <div class="row mt-16" style="justify-content: flex-end;">
+        <button class="btn secondary" id="btn-restart">重新上传</button>
+        <button class="btn success" id="btn-apply">
+          <span class="spinner" style="display:none"></span>
+          <span>确认并生成文件</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 步骤 4：下载 -->
+  <div id="step-done" style="display:none">
+    <div class="card" style="text-align:center; padding:40px;">
+      <div style="font-size:44px; margin-bottom:12px;">✅</div>
+      <h3 style="justify-content:center;">填充完成</h3>
+      <p class="muted" id="done-text"></p>
+      <div class="row mt-16" style="justify-content:center;">
+        <a class="btn success" id="btn-download" href="#">⬇ 下载填充后的文件</a>
+        <button class="btn secondary" id="btn-again">再填一份</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="/assets/kb-store.js"></script>
+<script src="/assets/app.js"></script>
+<script src="/assets/nav.js"></script>
+</body>
+</html>

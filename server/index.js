@@ -1,0 +1,98 @@
+/**
+ * 智能文档填充系统 - 服务器入口
+ * 启动: node server/index.js  →  http://localhost:3000
+ */
+const express = require('express');
+const path = require('path');
+
+const fillRoutes = require('./routes/fill');
+const kbRoutes = require('./routes/kb');
+const settingsRoutes = require('./routes/settings');
+const storage = require('./services/storage');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+// 默认只监听本机，避免知识库（含个人信息）暴露到局域网；需要局域网访问时设 HOST=0.0.0.0
+const HOST = process.env.HOST || '127.0.0.1';
+
+/**
+ * 是否本机访问（localhost / 127.0.0.1 / [::1]）
+ * 依据请求的 Host 头判断：用 IP 或域名访问时 Host 不是 localhost，即视为远程。
+ * 反向代理若把 Host 改写为 localhost，则远程也会被当作本机——请保留 Host 透传。
+ */
+function isLocalRequest(req) {
+  const raw = String(req.headers.host || '').trim();
+  if (raw) {
+    const name = raw.charAt(0) === '[' ? raw.slice(1, raw.indexOf(']')) : raw.split(':')[0];
+    const host = name.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  }
+  // 无 Host 头（极少数 HTTP/1.0 客户端）：退回看来源地址
+  const addr = (req.socket && req.socket.remoteAddress) || '';
+  return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+/** 设置页与设置接口仅限本机访问 */
+function settingsDeniedHtml(host) {
+  const safeHost = String(host || '').replace(/[<>&"]/g, '');
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<title>设置不可访问</title><style>body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f1f5f9;
+color:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:32px 36px;max-width:520px;
+box-shadow:0 8px 24px rgba(0,0,0,.06)}h1{font-size:18px;margin:0 0 12px}p{color:#64748b;line-height:1.8;margin:0 0 8px}
+a{color:#2563eb;text-decoration:none}code{background:#f1f5f9;padding:1px 5px;border-radius:4px}</style></head><body><div class="card">
+<h1>🔒 设置页面仅限本机访问</h1>
+<p>为保护服务器上的 AI 密钥配置，设置页只在通过 <code>localhost</code> 或 <code>127.0.0.1</code> 访问时可用。</p>
+<p>当前访问地址：<code>${safeHost}</code></p>
+<p><a href="/">← 返回填充工作台</a></p>
+</div></body></html>`;
+}
+
+app.use((req, res, next) => {
+  if (isLocalRequest(req)) return next();
+  if (req.path === '/settings.html' || req.path.startsWith('/api/settings')) {
+    if (req.path === '/settings.html') {
+      return res.status(403).type('html').send(settingsDeniedHtml(req.headers.host));
+    }
+    return res.status(403).json({ error: '设置接口仅限本机访问' });
+  }
+  next();
+});
+
+app.use(express.json({ limit: '2mb' }));
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+app.use(fillRoutes);
+app.use(kbRoutes);
+app.use(settingsRoutes);
+
+// 健康检查（供 Nginx / 监控探活）
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, uptime: Math.round(process.uptime()), storage: storage.STORAGE_ROOT });
+});
+
+// 兜底错误处理（multer 错误等）
+app.use((err, req, res, next) => {
+  console.error('[server]', err.message);
+  if (res.headersSent) return next(err);
+  res.status(err.status || 500).json({ error: err.message || '服务器内部错误' });
+});
+
+app.listen(PORT, HOST, () => {
+  console.log('');
+  console.log('  ========================================');
+  console.log('   智能文档填充系统已启动');
+  console.log(`   请用浏览器打开: http://localhost:${PORT}`);
+  console.log('   知识库保存在访问者浏览器本地，服务器不落盘');
+  console.log('  =========================================');
+  console.log('');
+
+  // 定期清理上传原件与填充结果（默认保留 2 小时），避免服务器残留用户文档
+  const removed = storage.cleanupStale(2 * 60 * 60 * 1000);
+  if (removed) console.log(`  [清理] 已删除 ${removed} 个过期临时目录`);
+  const timer = setInterval(() => {
+    const n = storage.cleanupStale(2 * 60 * 60 * 1000);
+    if (n) console.log(`  [清理] 删除 ${n} 个过期临时目录`);
+  }, 60 * 60 * 1000);
+  timer.unref();
+});

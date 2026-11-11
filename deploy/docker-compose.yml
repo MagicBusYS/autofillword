@@ -1,0 +1,27 @@
+# docker-compose 方式（可选，比 systemd 更省事）
+# 用法: docker compose -f deploy/docker-compose.yml up -d --build
+services:
+  autofill:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: autofill
+    restart: unless-stopped
+    ports:
+      # 只映射到本机，由宿主机 Nginx 反代；若要直接暴露改成 "3000:3000"
+      - "127.0.0.1:3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - STORAGE_DIR=/data
+    volumes:
+      - autofill-data:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  autofill-data:

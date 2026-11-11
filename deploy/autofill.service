@@ -1,0 +1,40 @@
+[Unit]
+Description=AI Autofill Web (智能文档填充)
+Documentation=file:///opt/autofill/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=autofill
+Group=autofill
+WorkingDirectory=/opt/autofill
+
+# 只监听本机，由 Nginx 对外提供 HTTPS
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+# 配置/缓存目录（升级代码时不会被覆盖）
+Environment=STORAGE_DIR=/var/lib/autofill
+
+ExecStart=/usr/bin/node /opt/autofill/server/index.js
+Restart=always
+RestartSec=3
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=autofill
+
+# 安全加固
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/autofill
+
+# 允许较多并发连接
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

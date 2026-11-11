@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能文档填充 - 知识库</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="logo">📄 智能文档填充</div>
+  <nav>
+    <a href="/">填充工作台</a>
+    <a href="/knowledge.html" class="active">知识库</a>
+    <a href="/settings.html">设置</a>
+  </nav>
+</header>
+
+<main class="container">
+  <h1 class="page-title">知识库</h1>
+  <p class="page-desc">上传已填写完整的文件，系统自动抽取字段并分类存储，之后填充模板时优先从这里匹配内容。</p>
+
+  <div class="alert local-notice">
+    <span>🔒</span>
+    <span><b>知识库内容仅保存在本地，杜绝信息泄露</b>——所有知识数据存放在你当前浏览器中，不会上传到服务器；换电脑或换浏览器请用下方「导出备份」迁移。</span>
+  </div>
+
+  <div class="kb-layout">
+    <!-- 左：档案列表 -->
+    <div class="card" style="align-self:start;">
+      <h3>档案列表</h3>
+      <div id="profile-list"></div>
+      <button class="btn secondary mt-16" id="btn-new-profile" style="width:100%">＋ 新建档案</button>
+      <div class="row mt-8">
+        <button class="btn sm secondary" id="btn-export">⬇ 导出备份</button>
+        <button class="btn sm secondary" id="btn-import">⬆ 导入备份</button>
+      </div>
+      <p class="muted mt-8">建议按场景分档：如「个人求职资料」「公司项目申报资料」，避免数据互相干扰。</p>
+    </div>
+
+    <!-- 右：当前档案内容 -->
+    <div class="card" id="detail-card" style="display:none; align-self:start;">
+      <h3 id="detail-title">档案详情</h3>
+      <div class="row mb-16" style="justify-content:space-between;">
+        <span class="muted" id="detail-count"></span>
+        <div class="row">
+          <button class="btn sm" id="btn-learn">📥 上传已填写文件学习</button>
+          <button class="btn sm secondary" id="btn-add-entry">＋ 手动添加</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>字段名</th>
+              <th style="min-width:180px;">内容</th>
+              <th style="width:100px;">分类</th>
+              <th style="width:110px;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="entry-tbody"></tbody>
+        </table>
+      </div>
+      <div class="row mt-16" style="justify-content:flex-end;">
+        <button class="btn danger sm" id="btn-delete-profile">删除该档案</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="empty-hint">
+    <div class="empty">
+      <div class="icon">📚</div>
+      <p>还没有知识库档案，点击「新建档案」开始吧</p>
+      <p class="muted mt-8">例如：新建「个人求职资料」，再上传一份你填写过的简历或应聘表，系统会自动学习其中的信息。</p>
+    </div>
+  </div>
+</main>
+
+<!-- 学习结果确认弹窗 -->
+<div class="modal-mask" id="learn-modal">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head">
+      <span>确认要加入知识库的内容</span>
+      <span class="close" data-close="learn-modal">×</span>
+    </div>
+    <div class="modal-body">
+      <div id="learn-msg"></div>
+      <p class="muted mb-16">来源文件：<span id="learn-file"></span>　请取消勾选不需要保存的条目。</p>
+      <div class="table-wrap" style="max-height:40vh; overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;"><input type="checkbox" id="learn-check-all" checked></th>
+              <th>字段名</th>
+              <th style="min-width:160px;">内容</th>
+              <th style="width:100px;">分类</th>
+            </tr>
+          </thead>
+          <tbody id="learn-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="learn-tables-wrap" style="display:none; margin-top:18px;">
+        <p class="muted mb-8">明细表（整表保存，填写同类模板时可整表套用）</p>
+        <div class="table-wrap" style="max-height:32vh; overflow-y:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:36px;"><input type="checkbox" id="learn-table-check-all" checked></th>
+                <th style="width:130px;">表名</th>
+                <th>列</th>
+                <th style="width:70px;">行数</th>
+              </tr>
+            </thead>
+            <tbody id="learn-tables-tbody"></tbody>
+          </table>
+        </div>
+        <div id="learn-table-preview" class="muted mt-8" style="font-size:12px; line-height:1.7;"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" data-close="learn-modal">取消</button>
+      <button class="btn success" id="btn-save-learn">保存到知识库</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建/编辑档案弹窗 -->
+<div class="modal-mask" id="profile-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <span id="profile-modal-title">新建档案</span>
+      <span class="close" data-close="profile-modal">×</span>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">档案名称</label>
+      <input type="text" id="profile-name" placeholder="如：个人求职资料">
+      <label class="field-label mt-16">备注（可选）</label>
+      <input type="text" id="profile-desc" placeholder="如：用于各公司应聘表填写">
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" data-close="profile-modal">取消</button>
+      <button class="btn" id="btn-save-profile">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 手动添加/编辑条目弹窗 -->
+<div class="modal-mask" id="entry-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <span id="entry-modal-title">添加字段</span>
+      <span class="close" data-close="entry-modal">×</span>
+    </div>
+    <div class="modal-body">
+      <label class="field-label">字段名</label>
+      <input type="text" id="entry-name" placeholder="如：联系电话">
+      <label class="field-label mt-16">内容</label>
+      <textarea id="entry-value" placeholder="如：13800138000"></textarea>
+      <label class="field-label mt-16">分类</label>
+      <select id="entry-category"></select>
+      <label class="field-label mt-16">别名（可选，用英文逗号或中文逗号分隔）</label>
+      <input type="text" id="entry-aliases" placeholder="如：电话, 手机, 联系方式">
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" data-close="entry-modal">取消</button>
+      <button class="btn" id="btn-save-entry">保存</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="learn-file-input" accept=".docx,.xlsx" style="display:none">
+<input type="file" id="import-file-input" accept=".json,application/json" style="display:none">
+
+<script src="/assets/kb-store.js"></script>
+<script src="/assets/knowledge.js"></script>
+<script src="/assets/nav.js"></script>
+</body>
+</html>

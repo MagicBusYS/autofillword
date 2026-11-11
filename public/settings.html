@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能文档填充 - 设置</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="logo">📄 智能文档填充</div>
+  <nav>
+    <a href="/">填充工作台</a>
+    <a href="/knowledge.html">知识库</a>
+    <a href="/settings.html" class="active">设置</a>
+  </nav>
+</header>
+
+<main class="container">
+  <h1 class="page-title">设置</h1>
+  <p class="page-desc">配置 AI 服务，用于智能识别填充位置与字段归一化。配置保存在本机，不会上传到任何第三方。</p>
+
+  <div class="card">
+    <h3>AI 服务配置</h3>
+    <div id="status-line" class="mb-16"></div>
+
+    <label class="field-label">服务商</label>
+    <select id="preset">
+      <option value="deepseek">DeepSeek（推荐）</option>
+      <option value="zhipu">智谱 GLM</option>
+      <option value="openai">OpenAI</option>
+      <option value="custom">自定义 / 其他 OpenAI 兼容服务</option>
+    </select>
+
+    <label class="field-label mt-16">API 地址（OpenAI 兼容格式）</label>
+    <input type="text" id="base-url" placeholder="https://api.deepseek.com">
+    <p class="muted mt-8" id="base-url-hint">
+      DeepSeek：<code>https://api.deepseek.com</code>　密钥在
+      <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer">platform.deepseek.com</a> 获取
+    </p>
+
+    <label class="field-label mt-16">API Key</label>
+    <input type="password" id="api-key" placeholder="填写后保存；留空表示不修改">
+    <div class="row mt-8">
+      <button class="btn sm secondary" id="btn-clear-key">清除已保存的 Key</button>
+    </div>
+
+    <label class="field-label mt-16">模型名称</label>
+    <input type="text" id="model" placeholder="deepseek-chat" list="model-options" autocomplete="off">
+    <datalist id="model-options"></datalist>
+    <p class="muted mt-8" id="model-hint">DeepSeek 常用：deepseek-chat（通用，快且便宜）、deepseek-reasoner（推理增强，较慢较贵）</p>
+
+    <div class="row mt-24">
+      <button class="btn" id="btn-save">保存配置</button>
+      <button class="btn secondary" id="btn-test">测试连接</button>
+    </div>
+    <div id="test-result" class="mt-16"></div>
+  </div>
+
+  <div class="card">
+    <h3>AI 在系统中的用途</h3>
+    <ul class="muted" style="padding-left:20px; line-height:1.9; font-size:13px;">
+      <li><b>识别填充位置</b>：在规则预筛基础上，判断哪些位置确实需要填写、排除标题与说明文字。</li>
+      <li><b>规范字段名</b>：把「申请人」「姓名」「填报人」统一为同一字段，便于跨模板复用。</li>
+      <li><b>学习入库</b>：上传已填写文件时，自动归一化字段名并按个人信息、项目信息等分类。</li>
+    </ul>
+    <p class="muted mt-16">
+      未配置 AI 时系统仍可正常使用：依靠规则识别填充位置，并直接从知识库按字段名精确/模糊匹配填充。
+    </p>
+  </div>
+
+  <div class="card">
+    <h3>数据存储说明</h3>
+    <ul class="muted" style="padding-left:20px; line-height:1.9; font-size:13px;">
+      <li>所有配置、知识库与文件均保存在本机 <code>server/storage/</code> 目录。</li>
+      <li>API Key 以明文保存在本机 <code>server/storage/data/settings.json</code>，请勿共享该目录。</li>
+      <li>上传的文件仅用于本地解析与填充，除发给所配置的 AI 服务的字段信息外不外传。</li>
+    </ul>
+  </div>
+</main>
+
+<script src="/assets/settings.js"></script>
+</body>
+</html>

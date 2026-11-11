@@ -1,0 +1,6 @@
+node_modules/
+server/storage/uploads/
+server/storage/outputs/
+server/storage/data/
+samples/
+*.log
