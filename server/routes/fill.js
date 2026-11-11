@@ -51,6 +51,11 @@ router.post('/api/fill', upload.single('file'), (req, res) => {
       }
     }
 
+    // 浏览器本地日期（YYYY-MM-DD），用于"填表日期"自动填充，避免服务器时区差异
+    const today = req.body && /^\d{4}-\d{2}-\d{2}$/.test(String(req.body.today || ''))
+      ? String(req.body.today)
+      : null;
+
     const job = fill.createJob({
       fileName: originalName,
       fileType: ext === '.xlsx' ? 'xlsx' : 'docx',
@@ -64,7 +69,7 @@ router.post('/api/fill', upload.single('file'), (req, res) => {
     fs.renameSync(req.file.path, dest);
 
     // 异步分析（知识库只在本次进程内存中使用）
-    fill.analyzeJob(job.id, kbEntries).catch((err) => console.error('[fill] 异步分析异常:', err));
+    fill.analyzeJob(job.id, kbEntries, { today }).catch((err) => console.error('[fill] 异步分析异常:', err));
 
     res.json({ ok: true, jobId: job.id });
   } catch (err) {

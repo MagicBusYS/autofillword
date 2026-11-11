@@ -68,7 +68,9 @@ function createJob({ fileName, fileType, profileId }) {
 
 // ---------- 工具 ----------
 
-function todayString() {
+function todayString(override) {
+  // 优先用浏览器传来的日期（避免服务器时区与访问者不一致）
+  if (override && /^\d{4}-\d{2}-\d{2}$/.test(String(override))) return String(override);
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -177,7 +179,7 @@ async function aiAnalyzeBatch(cands, kbEntries, fileName) {
 
 // ---------- 主分析流程 ----------
 
-async function analyzeJob(jobId, kbEntriesInput) {
+async function analyzeJob(jobId, kbEntriesInput, opts = {}) {
   const job = getJob(jobId);
   if (!job) throw new Error('任务不存在');
   try {
@@ -237,7 +239,7 @@ async function analyzeJob(jobId, kbEntriesInput) {
 
       // 4.3 日期自动
       if (value == null && a.needFill !== false && (isDateField(fieldName) || isDateField(cand.label))) {
-        value = todayString();
+        value = todayString(opts.today);
         source = 'auto-date';
         confidence = 0.9;
       }

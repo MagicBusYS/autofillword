@@ -154,7 +154,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d autofill.example.com
+sudo certbot --nginx -d magicbus.asia -d www.magicbus.asia
 # 按提示填邮箱、同意条款，选择"重定向 HTTP 到 HTTPS"
 ```
 
@@ -162,6 +162,65 @@ sudo certbot --nginx -d autofill.example.com
 
 ```bash
 sudo certbot renew --dry-run
+```
+
+### 用域名 magicbus.asia 时还要改什么
+
+**1) Nginx 的 server_name**（已默认写好 `magicbus.asia www.magicbus.asia`）
+
+如果不是从仓库的 `deploy/nginx.conf` 拷贝的，手动改：
+
+```bash
+sudo sed -i 's/server_name .*;/server_name magicbus.asia www.magicbus.asia;/' /etc/nginx/sites-available/autofill
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**2) 阿里云安全组放行 80 / 443**（控制台 → ECS → 安全组 → 入方向）
+
+只放 80/443 就够，业务端口 3000 不要对公网开放。
+
+**3) 服务器时区设为北京时间**
+
+否则跨零点时自动填的"填表日期"会差一天（应用已改为优先用访问者浏览器的日期，但仍建议设置）：
+
+```bash
+sudo timedatectl set-timezone Asia/Shanghai
+timedatectl    # 确认 Time zone: Asia/Shanghai (CST, +0800)
+```
+
+**4) ICP 备案（中国大陆地域的服务器必须）**
+
+> ⚠️ 这是域名能否访问的前提，不是可选项。
+
+- 阿里云**大陆地域**的 ECS：域名解析到公网 IP 后，**未备案的域名访问 80/443 会被阿里云拦截**（出现"该网站尚未备案"的提示页），与代码无关。需先在阿里云备案系统提交，通常 7~20 个工作日。
+- `.asia` 后缀：工信部已批复，可以备案；但**北京管局明确不受理 .asia**（按国别域名处理），备案主体在北京建议换 `.com` / `.cn`。
+- 阿里云**香港或海外地域**的 ECS：不需要备案，解析生效即可访问。
+
+备案通过前想先用：直接访问 `http://服务器公网IP`（IP 访问通常不受备案拦截，但 HTTPS 证书需要域名，且部分服务商会提示）。
+
+**5) 备案/证书未就绪时的临时方案**
+
+用 IP 访问 + 自签证书，或先只开 80 做功能验证；证书可用 DNS-01 方式签发（不依赖 80 端口）：
+
+```bash
+sudo apt install -y python3-certbot-dns-aliyun  # 需配置阿里云 AccessKey
+sudo certbot certonly --authenticator dns-aliyun \
+  --dns-aliyun-credentials /etc/letsencrypt/aliyun.ini \
+  -d magicbus.asia -d www.magicbus.asia
+```
+
+**6) 用域名访问后，设置页会打不开（正常）**
+
+设置页只允许 `localhost` / `127.0.0.1` 访问。要改 AI 配置：
+
+```bash
+# 方式 1：服务器上直接调接口
+curl -X POST http://127.0.0.1:3000/api/settings -H "Content-Type: application/json" \
+  -d '{"baseUrl":"https://api.deepseek.com","model":"deepseek-chat","apiKey":"sk-..."}'
+
+# 方式 2：SSH 隧道 + 浏览器
+ssh -N -L 127.0.0.1:3000:127.0.0.1:3000 root@服务器IP
+# 本地打开 http://127.0.0.1:3000/settings.html
 ```
 
 ---

@@ -67,6 +67,13 @@
     }
   }
 
+  /** 本地日期 YYYY-MM-DD（用于"填表日期"自动填充） */
+  function localDateString() {
+    var d = new Date();
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
   // ---------- 上传 ----------
 
   function uploadFile(file) {
@@ -78,6 +85,8 @@
     var fd = new FormData();
     fd.append('file', file);
     fd.append('kb', JSON.stringify(currentKbEntries()));
+    // 带上访问者本地日期，避免服务器时区不同导致"填表日期"差一天
+    fd.append('today', localDateString());
     show(els.stepAnalyzing);
 
     fetch('/api/fill', { method: 'POST', body: fd })
