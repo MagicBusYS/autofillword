@@ -64,6 +64,16 @@
           <input type="checkbox" id="only-fillable" checked> 只显示待填充项
         </label>
       </div>
+
+      <!-- 操作按钮放在表格上方，长表格滚动时保持可见 -->
+      <div class="confirm-actions">
+        <button class="btn secondary" id="btn-restart">重新上传</button>
+        <button class="btn success" id="btn-apply">
+          <span class="spinner" style="display:none"></span>
+          <span>确认并生成文件</span>
+        </button>
+      </div>
+
       <div class="table-wrap">
         <table id="fields-table">
           <thead>
@@ -78,13 +88,6 @@
           </thead>
           <tbody id="fields-tbody"></tbody>
         </table>
-      </div>
-      <div class="row mt-16" style="justify-content: flex-end;">
-        <button class="btn secondary" id="btn-restart">重新上传</button>
-        <button class="btn success" id="btn-apply">
-          <span class="spinner" style="display:none"></span>
-          <span>确认并生成文件</span>
-        </button>
       </div>
     </div>
   </div>

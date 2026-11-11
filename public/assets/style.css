@@ -267,6 +267,20 @@ tr:last-child td { border-bottom: none; }
 .muted { color: var(--text-muted); font-size: 13px; }
 .ellipsis { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* 确认页操作栏：位于表格上方，长表格滚动时吸顶 */
+.confirm-actions {
+  position: sticky;
+  top: 60px;                 /* 顶栏高度 */
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 10px 0 12px;
+  margin-bottom: 12px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
 /* 空状态 */
 .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
 .empty .icon { font-size: 32px; margin-bottom: 8px; }

@@ -45,18 +45,28 @@ npm -v
 
 ## 三、上传代码
 
+### 方式 A：从 GitHub 克隆（推荐）
+
+```bash
+sudo git clone https://github.com/MagicBusYS/autofillword /tmp/autofill-src
+```
+
+私有仓库需要凭据（Deploy Key 或 Personal Access Token）：
+
+```bash
+# 用 PAT（替换成你的 token）
+sudo git clone https://<用户名>:<token>@github.com/MagicBusYS/autofillword /tmp/autofill-src
+```
+
+后续升级直接 `cd /opt/autofill && sudo git pull` 即可（见第十节）。
+
+### 方式 B：从本地直接上传
+
 在**本地**项目目录执行（Windows 用 PowerShell / Git Bash）：
 
 ```bash
-# 只传运行必需的文件，避免把 node_modules、storage 传上去
 scp -r package.json package-lock.json server public deploy README.md \
     root@服务器IP:/tmp/autofill-src
-```
-
-或在服务器上用 git：
-
-```bash
-sudo git clone <你的仓库地址> /tmp/autofill-src
 ```
 
 然后在服务器上建立目录并授权：
@@ -203,7 +213,13 @@ ssh -L 3000:127.0.0.1:3000 root@服务器IP
 ### 升级代码
 
 ```bash
-# 本地重新上传（或服务器 git pull）
+# 方式 A：GitHub 仓库（推荐）
+cd /opt/autofill
+sudo -u autofill git pull
+sudo -u autofill npm ci --omit=dev
+sudo systemctl restart autofill
+
+# 方式 B：本地 rsync 上传
 sudo rsync -av --exclude node_modules --exclude storage /tmp/autofill-src/ /opt/autofill/
 cd /opt/autofill && sudo -u autofill npm ci --omit=dev
 sudo systemctl restart autofill
