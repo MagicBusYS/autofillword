@@ -30,7 +30,12 @@ router.get('/api/admin/status', (req, res) => {
   const enabled = adminAuth.isEnabled();
   const local = isLocal(req);
   const session = adminAuth.hasSession(req);
-  res.json({ enabled, local, authorized: local || session });
+  const payload = { enabled, local, authorized: local || session };
+  if (!enabled) {
+    // 密码没生效时附带诊断，登录页直接显示原因
+    payload.diag = adminAuth.diagnostics();
+  }
+  res.json(payload);
 });
 
 router.post('/api/admin/login', express.json({ limit: '4kb' }), (req, res) => {

@@ -101,7 +101,8 @@ app.listen(PORT, HOST, () => {
     console.log('   ⚠️  ADMIN_PASSWORD 少于 8 位，建议改用更长的强密码');
   }
   if (!adminEnabled) {
-    console.log('   如需远程管理：在 /etc/autofill.env 写 ADMIN_PASSWORD=强密码 后重启服务');
+    const diag = adminAuth.diagnostics();
+    console.log('   📋 诊断: ' + (diag.hint || '未配置 ADMIN_PASSWORD'));
   }
   console.log('  =========================================');
   console.log('');

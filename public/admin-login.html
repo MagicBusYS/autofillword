@@ -73,7 +73,9 @@ sudo journalctl -u autofill -n 15 --no-pager | grep 管理端</pre>
       if (!/^\/[^\/\\]/.test(next)) next = '/admin.html';
       location.replace(next);
     } else if (!s.enabled) {
-      show('服务器未配置管理密码（ADMIN_PASSWORD），远程管理尚未启用。', false);
+      // 显示服务端给出的诊断（说明具体断在哪一环），保留通用的配置命令
+      var diag = s.diag && s.diag.hint ? '原因：' + s.diag.hint : '';
+      show(diag || '服务器未配置管理密码（ADMIN_PASSWORD），远程管理尚未启用。', false);
       var hint = document.getElementById('setup-hint');
       if (hint) hint.style.display = '';
       btn.disabled = true;

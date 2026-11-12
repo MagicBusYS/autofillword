@@ -134,6 +134,65 @@ function lockRemainMs(ip) {
   return Math.max(0, f.until - Date.now());
 }
 
+// ---------- 诊断（帮助定位"密码没生效"） ----------
+
+function fileExists(p) {
+  try {
+    return fs.existsSync(p);
+  } catch (e) {
+    return false;
+  }
+}
+
+function fileContains(p, needle) {
+  try {
+    if (!fs.existsSync(p)) return false;
+    return fs.readFileSync(p, 'utf-8').includes(needle);
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * 返回"为什么密码没生效"的诊断信息（不含任何秘密值）。
+ * 服务启动时打印 + /api/admin/status 返回，让登录页直接显示原因。
+ */
+function diagnostics() {
+  const pw = getPassword();
+  const envFile = '/etc/autofill.env';
+  const unitFile = '/etc/systemd/system/autofill.service';
+  const envExists = fileExists(envFile);
+  const unitHasEnvFile = fileContains(unitFile, 'EnvironmentFile') && fileContains(unitFile, 'autofill.env');
+
+  let hint = '';
+  if (pw.length > 0) {
+    hint = '';
+  } else if (!envExists && !unitHasEnvFile) {
+    hint = '未找到 /etc/autofill.env，且 systemd unit 缺少 EnvironmentFile 配置。' +
+      '请执行：sudo cp /opt/autofill/deploy/autofill.service /etc/systemd/system/ && ' +
+      'sudo bash -c \'echo "ADMIN_PASSWORD=你的强密码" > /etc/autofill.env\' && ' +
+      'sudo chmod 600 /etc/autofill.env && sudo systemctl daemon-reload && sudo systemctl restart autofill';
+  } else if (!envExists) {
+    hint = '未找到 /etc/autofill.env（文件不存在或路径不对）。请执行：' +
+      'sudo bash -c \'echo "ADMIN_PASSWORD=你的强密码" > /etc/autofill.env\' && ' +
+      'sudo chmod 600 /etc/autofill.env && sudo systemctl restart autofill';
+  } else if (!unitHasEnvFile) {
+    hint = '/etc/autofill.env 存在，但 systemd unit 缺少 EnvironmentFile 配置（可能是旧版 unit）。请执行：' +
+      'sudo cp /opt/autofill/deploy/autofill.service /etc/systemd/system/ && ' +
+      'sudo systemctl daemon-reload && sudo systemctl restart autofill';
+  } else {
+    hint = '配置文件与 unit 都正常，但进程尚未读取到环境变量（未重启或未 daemon-reload）。请执行：' +
+      'sudo systemctl daemon-reload && sudo systemctl restart autofill';
+  }
+
+  return {
+    passwordSet: pw.length > 0,
+    envFileExists: envExists,
+    unitHasEnvFile,
+    hint,
+  };
+}
+
 /** 生成 Set-Cookie 字符串 */
 function buildCookie(token, req) {
   const secure = req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0] === 'https';
@@ -166,4 +225,5 @@ module.exports = {
   lockRemainMs,
   buildCookie,
   buildClearCookie,
+  diagnostics,
 };
