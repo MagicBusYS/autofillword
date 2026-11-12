@@ -228,14 +228,41 @@ sudo systemctl restart autofill
 
 **② 访问方式**
 
-浏览器直接打开：
+监控台**不在导航栏显示**，请直接访问 URL（可收藏书签）：
 
 - 设置页：`https://magicbus.asia/settings.html`
 - 监控台：`https://magicbus.asia/admin.html`
 
-未登录会自动跳到 `https://magicbus.asia/admin-login.html`，输入密码后 7 天内免登录（签名 Cookie），导航栏会出现「退出登录」。
+未登录会自动跳到 `https://magicbus.asia/admin-login.html`，输入密码后 7 天内免登录（签名 Cookie），登录后导航栏会出现「退出登录」。
 
-**③ 忘记密码 / 关闭远程管理**
+**③ 密码没生效？**（访问 `/admin.html` 提示"服务器未配置管理密码"）
+
+说明进程里没有读到 `ADMIN_PASSWORD`。按顺序排查：
+
+```bash
+# 1) 文件是否存在、内容是否正确
+sudo cat /etc/autofill.env
+sudo ls -l /etc/autofill.env          # 应为 600
+
+# 2) unit 文件是否包含 EnvironmentFile（旧版 unit 没有这一行）
+grep -n "EnvironmentFile" /etc/systemd/system/autofill.service
+
+# 3) 进程实际拿到的环境变量
+sudo tr '\0' '\n' < /proc/$(systemctl show -p MainPID --value autofill)/environ | grep ADMIN_PASSWORD
+
+# 4) 看启动日志（应显示 ✅ 已启用）
+sudo journalctl -u autofill -n 20 --no-pager | grep 管理端
+```
+
+常见原因：
+
+| 现象 | 原因 | 解决 |
+| --- | --- | --- |
+| 日志显示"⚠️ 未启用" | 没建 `/etc/autofill.env`，或只 `export` 在当前 shell | 写到 `/etc/autofill.env`（权限 600） |
+| 日志显示"⚠️ 未启用" | unit 文件是旧版，没有 `EnvironmentFile` | `sudo cp /opt/autofill/deploy/autofill.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl restart autofill` |
+| 日志显示"✅ 已启用"但仍要求本机 | 你用的是 `http://IP` 且密码正确却没登录 | 登录后用 cookie 访问；若浏览器禁用 cookie 需改用 HTTPS/隧道 |
+
+**④ 忘记密码 / 关闭远程管理**
 
 ```bash
 # 改密码（旧会话立即失效）
@@ -246,7 +273,7 @@ sudo systemctl restart autofill
 sudo rm -f /etc/autofill.env && sudo systemctl restart autofill
 ```
 
-**④ 安全机制**
+**⑤ 安全机制**
 
 | 机制 | 说明 |
 | --- | --- |
@@ -256,7 +283,7 @@ sudo rm -f /etc/autofill.env && sudo systemctl restart autofill
 | 传输 | 勾选 Secure（HTTPS 下才发送），HttpOnly 防 XSS 读取 |
 | 本机 | `localhost` / `127.0.0.1` 访问仍然免登录，方便服务器上直接操作 |
 
-**⑤ 备用方式：SSH 隧道（不设密码时可用）**
+**⑥ 备用方式：SSH 隧道（不设密码时可用）**
 
 ```bash
 ssh -N -L 127.0.0.1:3001:127.0.0.1:3000 root@服务器IP

@@ -40,9 +40,16 @@
     <button class="btn" type="submit" id="btn-login">登录</button>
   </form>
   <div class="msg" id="msg"></div>
+  <pre id="setup-hint" style="display:none; margin-top:14px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:12px; line-height:1.7; overflow-x:auto; color:#0f172a;"># 在服务器上执行：
+sudo bash -c 'echo "ADMIN_PASSWORD=你的强密码" > /etc/autofill.env'
+sudo chmod 600 /etc/autofill.env
+sudo systemctl restart autofill
+
+# 确认已生效（应显示 ✅ 已启用）
+sudo journalctl -u autofill -n 15 --no-pager | grep 管理端</pre>
 
   <div class="foot">
-    密码由服务器环境变量 <code>ADMIN_PASSWORD</code> 配置；忘记可在服务器上修改后重启服务。<br>
+    密码由服务器环境变量 <code>ADMIN_PASSWORD</code> 配置；修改后需重启服务，旧会话自动失效。<br>
     <a href="/" style="color:#2563eb;text-decoration:none;">← 返回填充工作台</a>
   </div>
 </div>
@@ -66,8 +73,11 @@
       if (!/^\/[^\/\\]/.test(next)) next = '/admin.html';
       location.replace(next);
     } else if (!s.enabled) {
-      show('服务器未配置管理密码（ADMIN_PASSWORD），请先在服务器上设置后重启服务。', false);
+      show('服务器未配置管理密码（ADMIN_PASSWORD），远程管理尚未启用。', false);
+      var hint = document.getElementById('setup-hint');
+      if (hint) hint.style.display = '';
       btn.disabled = true;
+      btn.textContent = '暂不可登录';
     }
   }).catch(function () {});
 

@@ -44,21 +44,6 @@ function isLocalOnlyPath(p) {
   return LOCAL_ONLY_API_PREFIXES.some((prefix) => p.startsWith(prefix));
 }
 
-function localizedDeniedHtml(host, pageName) {
-  const safeHost = String(host || '').replace(/[<>&"]/g, '');
-  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
-<title>${pageName}不可访问</title><style>body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f1f5f9;
-color:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:32px 36px;max-width:520px;
-box-shadow:0 8px 24px rgba(0,0,0,.06)}h1{font-size:18px;margin:0 0 12px}p{color:#64748b;line-height:1.8;margin:0 0 8px}
-a{color:#2563eb;text-decoration:none}code{background:#f1f5f9;padding:1px 5px;border-radius:4px}</style></head><body><div class="card">
-<h1>🔒 ${pageName}仅限本机访问</h1>
-<p>为保护服务器配置与访问统计，该页面只在通过 <code>localhost</code> 或 <code>127.0.0.1</code> 访问时可用。</p>
-<p>当前访问地址：<code>${safeHost}</code></p>
-<p><a href="/">← 返回填充工作台</a></p>
-</div></body></html>`;
-}
-
 app.use((req, res, next) => {
   if (!isLocalOnlyPath(req.path)) return next();
   // 登录页与登录接口本身放行，否则无法登录
@@ -68,16 +53,18 @@ app.use((req, res, next) => {
   // 远程但已登录（签名 cookie 有效）
   if (adminAuth.hasSession(req)) return next();
 
-  // 未授权：页面跳登录页，接口返回 401
+  // 未授权：页面一律跳登录页（未配置密码时登录页会说明如何配置），接口返回 401
   if (req.path === '/settings.html' || req.path === '/admin.html' || req.path === '/admin.html/') {
-    if (!adminAuth.isEnabled()) {
-      const name = req.path === '/settings.html' ? '设置页面' : '监控台';
-      return res.status(403).type('html').send(localizedDeniedHtml(req.headers.host, name));
-    }
     const nextPath = req.originalUrl || req.path;
     return res.redirect(302, `/admin-login.html?next=${encodeURIComponent(nextPath)}`);
   }
-  return res.status(401).json({ error: '未登录或会话已过期', needLogin: true, loginPath: '/admin-login.html' });
+  return res.status(401).json({
+    error: adminAuth.isEnabled()
+      ? '未登录或会话已过期'
+      : '服务器未配置管理密码（ADMIN_PASSWORD），远程管理未启用',
+    needLogin: true,
+    loginPath: '/admin-login.html',
+  });
 });
 
 app.use(express.json({ limit: '2mb' }));
@@ -102,11 +89,20 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, HOST, () => {
+  const adminEnabled = adminAuth.isEnabled();
+  const pwLen = adminAuth.getPassword().length;
   console.log('');
   console.log('  ========================================');
   console.log('   智能文档填充系统已启动');
   console.log(`   请用浏览器打开: http://localhost:${PORT}`);
   console.log('   知识库保存在访问者浏览器本地，服务器不落盘');
+  console.log(`   管理端远程访问: ${adminEnabled ? '✅ 已启用（需密码登录）' : '⚠️ 未启用（仅本机可访问）'}`);
+  if (adminEnabled && pwLen < 8) {
+    console.log('   ⚠️  ADMIN_PASSWORD 少于 8 位，建议改用更长的强密码');
+  }
+  if (!adminEnabled) {
+    console.log('   如需远程管理：在 /etc/autofill.env 写 ADMIN_PASSWORD=强密码 后重启服务');
+  }
   console.log('  =========================================');
   console.log('');
 
