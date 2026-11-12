@@ -8,10 +8,74 @@
  * 写回：按块 id 定位单元格，支持整格写入与占位符内联替换（如 "姓名：____"）。
  */
 const ExcelJS = require('exceljs');
+const JSZip = require('jszip');
+const fs = require('fs');
 
 // 扫描上限，防止超大表格拖垮分析
 const MAX_ROWS = 300;
 const MAX_COLS = 60;
+
+/**
+ * 剥离 dataValidations
+ *
+ * exceljs 读取时会把 `<dataValidation sqref="A2:A1048576">` 里的每个地址展开成单元格，
+ * 整列范围（100 多万行）会让读取直接卡死。我们只读单元格的值，
+ * 数据验证对解析没有意义，因此读取前移除、写回后再原样还原。
+ *
+ * @returns {{buffer: Buffer, saved: Object<string,string>}}
+ */
+async function stripDataValidations(buf) {
+  let zip;
+  try {
+    zip = await JSZip.loadAsync(buf);
+  } catch (e) {
+    return { buffer: buf, saved: {} }; // 不是 zip（交给 exceljs 报错）
+  }
+  const saved = {};
+  let changed = false;
+  const names = Object.keys(zip.files).filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(n));
+  for (const n of names) {
+    const f = zip.file(n);
+    if (!f) continue;
+    const xml = await f.async('string');
+    const m = xml.match(/<dataValidations[\s\S]*?<\/dataValidations>/i);
+    if (!m) continue;
+    saved[n] = m[0];
+    zip.file(n, xml.replace(m[0], ''));
+    changed = true;
+  }
+  if (!changed) return { buffer: buf, saved: {} };
+  const out = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  return { buffer: out, saved };
+}
+
+/** 写回后把之前剥离的 dataValidations 还原到对应工作表 */
+async function restoreDataValidations(outPath, saved) {
+  const names = Object.keys(saved || {});
+  if (!names.length) return;
+  try {
+    const zip = await JSZip.loadAsync(fs.readFileSync(outPath));
+    let changed = false;
+    for (const n of names) {
+      const f = zip.file(n);
+      if (!f) continue;
+      const xml = await f.async('string');
+      if (xml.indexOf('<dataValidations') !== -1) continue;
+      const block = saved[n];
+      // 按 schema 顺序尽量靠后插入：extLst 之前，否则 worksheet 结束前
+      const next = xml.indexOf('<extLst') !== -1
+        ? xml.replace('<extLst', block + '<extLst')
+        : xml.replace('</worksheet>', block + '</worksheet>');
+      zip.file(n, next);
+      changed = true;
+    }
+    if (!changed) return;
+    const out = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+    fs.writeFileSync(outPath, out);
+  } catch (e) {
+    console.warn('[xlsx] 还原数据验证失败:', e.message);
+  }
+}
 
 function colLetter(num) {
   let s = '';
@@ -37,6 +101,10 @@ function expandRange(range) {
   const a = decode(parts[0]);
   const b = decode(parts[1]);
   if (!a || !b) return [range];
+  // 防护：整列/整表级合并（如 A1:A1048576）不展开，避免生成上亿个地址卡死进程
+  const rowSpan = Math.abs(b.row - a.row) + 1;
+  const colSpan = Math.abs(b.col - a.col) + 1;
+  if (rowSpan * colSpan > 20000) return [parts[0]];
   const list = [];
   for (let r = Math.min(a.row, b.row); r <= Math.max(a.row, b.row); r++) {
     for (let c = Math.min(a.col, b.col); c <= Math.max(a.col, b.col); c++) {
@@ -102,7 +170,10 @@ function cellText(cell) {
  */
 async function parse(filePath) {
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(filePath);
+  // 先剥离整列 dataValidations，避免 exceljs 展开上百万单元格导致卡死
+  const raw = fs.readFileSync(filePath);
+  const sanitized = await stripDataValidations(raw);
+  await wb.xlsx.load(sanitized.buffer);
 
   const blocks = [];
   const sheetNames = [];
@@ -234,7 +305,9 @@ function inheritFont(ws, cell) {
  */
 async function applyValues(srcPath, outPath, values, placements) {
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(srcPath);
+  // 同样先剥离 dataValidations（否则读取就卡死），写回后再还原
+  const sanitized = await stripDataValidations(fs.readFileSync(srcPath));
+  await wb.xlsx.load(sanitized.buffer);
 
   for (const { id, value } of values) {
     const placement = placements.get(id);
@@ -268,6 +341,9 @@ async function applyValues(srcPath, outPath, values, placements) {
   }
 
   await wb.xlsx.writeFile(outPath);
+
+  // 还原模板原有的数据验证（下拉框等）
+  await restoreDataValidations(outPath, sanitized.saved);
 }
 
-module.exports = { parse, applyValues, colLetter };
+module.exports = { parse, applyValues, colLetter, stripDataValidations };
