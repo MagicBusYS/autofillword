@@ -209,19 +209,61 @@ sudo certbot certonly --authenticator dns-aliyun \
   -d magicbus.asia -d www.magicbus.asia
 ```
 
-**6) 用域名访问后，设置页会打不开（正常）**
+**6) 用域名访问后，设置页与监控台需要登录（默认）**
 
-设置页只允许 `localhost` / `127.0.0.1` 访问。要改 AI 配置：
+设置页（AI 配置）和监控台（访问统计）对公网开放但受密码保护，只有持有密码的你能进入。
+
+**① 在服务器上设置管理密码**
 
 ```bash
-# 方式 1：服务器上直接调接口
-curl -X POST http://127.0.0.1:3000/api/settings -H "Content-Type: application/json" \
-  -d '{"baseUrl":"https://api.deepseek.com","model":"deepseek-chat","apiKey":"sk-..."}'
-
-# 方式 2：SSH 隧道 + 浏览器
-ssh -N -L 127.0.0.1:3000:127.0.0.1:3000 root@服务器IP
-# 本地打开 http://127.0.0.1:3000/settings.html
+sudo bash -c 'cat > /etc/autofill.env' <<'EOF'
+ADMIN_PASSWORD=换成你自己的强密码
+EOF
+sudo chmod 600 /etc/autofill.env
+sudo systemctl restart autofill
 ```
+
+> ⚠️ 密码必须以**明文经 HTTPS** 提交才安全。**务必先完成第七步的 HTTPS**，否则密码会以明文在网络上传输。
+> 密码至少 12 位，建议字母+数字+符号；不需要记忆复杂的话用一句长短语（如 `autofill-2026-MagicBus`）。
+
+**② 访问方式**
+
+浏览器直接打开：
+
+- 设置页：`https://magicbus.asia/settings.html`
+- 监控台：`https://magicbus.asia/admin.html`
+
+未登录会自动跳到 `https://magicbus.asia/admin-login.html`，输入密码后 7 天内免登录（签名 Cookie），导航栏会出现「退出登录」。
+
+**③ 忘记密码 / 关闭远程管理**
+
+```bash
+# 改密码（旧会话立即失效）
+sudo sed -i 's/^ADMIN_PASSWORD=.*/ADMIN_PASSWORD=新密码/' /etc/autofill.env
+sudo systemctl restart autofill
+
+# 彻底关闭远程管理（恢复"仅本机"）
+sudo rm -f /etc/autofill.env && sudo systemctl restart autofill
+```
+
+**④ 安全机制**
+
+| 机制 | 说明 |
+| --- | --- |
+| 密码存储 | 只在环境变量里，不写数据库、不进代码仓库 |
+| 会话 | HMAC-SHA256 签名 Cookie，7 天有效，改密码即失效 |
+| 防爆破 | 同 IP 连续 5 次密码错误，锁定 10 分钟 |
+| 传输 | 勾选 Secure（HTTPS 下才发送），HttpOnly 防 XSS 读取 |
+| 本机 | `localhost` / `127.0.0.1` 访问仍然免登录，方便服务器上直接操作 |
+
+**⑤ 备用方式：SSH 隧道（不设密码时可用）**
+
+```bash
+ssh -N -L 127.0.0.1:3001:127.0.0.1:3000 root@服务器IP
+# 本地打开 http://127.0.0.1:3001/admin.html
+```
+
+访问统计保存在 `$STORAGE_DIR/data/metrics.json`，可随 AI 配置一起备份。
 
 ---
 

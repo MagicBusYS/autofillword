@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const storageSvc = require('../services/storage');
 const knowledge = require('../services/knowledge');
 const learn = require('../services/learn');
+const metrics = require('../services/metrics');
 
 const router = express.Router();
 
@@ -81,6 +82,12 @@ router.post('/api/kb/learn', upload.single('file'), async (req, res) => {
       normalized: result.normalized,
       aiUsed: result.aiUsed,
       method: result.method,
+    });
+    // 统计：知识库学习次数
+    metrics.recordAction('learn', {
+      vid: req.body && req.body.vid,
+      ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : (req.socket && req.socket.remoteAddress),
+      ua: req.headers['user-agent'],
     });
   } catch (err) {
     console.error('[kb/learn] 失败:', err);

@@ -8,7 +8,10 @@ const path = require('path');
 const fillRoutes = require('./routes/fill');
 const kbRoutes = require('./routes/kb');
 const settingsRoutes = require('./routes/settings');
+const metricsRoutes = require('./routes/metrics');
+const adminAuthRoutes = require('./routes/adminAuth');
 const storage = require('./services/storage');
+const adminAuth = require('./services/adminAuth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,31 +35,49 @@ function isLocalRequest(req) {
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
 }
 
-/** 设置页与设置接口仅限本机访问 */
-function settingsDeniedHtml(host) {
+/** 设置页 / 监控台 与对应接口仅限本机访问 */
+const LOCAL_ONLY_PAGES = new Set(['/settings.html', '/admin.html', '/admin.html/']);
+const LOCAL_ONLY_API_PREFIXES = ['/api/settings', '/api/metrics/summary', '/api/metrics/reset'];
+
+function isLocalOnlyPath(p) {
+  if (LOCAL_ONLY_PAGES.has(p)) return true;
+  return LOCAL_ONLY_API_PREFIXES.some((prefix) => p.startsWith(prefix));
+}
+
+function localizedDeniedHtml(host, pageName) {
   const safeHost = String(host || '').replace(/[<>&"]/g, '');
   return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
-<title>设置不可访问</title><style>body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f1f5f9;
+<title>${pageName}不可访问</title><style>body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f1f5f9;
 color:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
 .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:32px 36px;max-width:520px;
 box-shadow:0 8px 24px rgba(0,0,0,.06)}h1{font-size:18px;margin:0 0 12px}p{color:#64748b;line-height:1.8;margin:0 0 8px}
 a{color:#2563eb;text-decoration:none}code{background:#f1f5f9;padding:1px 5px;border-radius:4px}</style></head><body><div class="card">
-<h1>🔒 设置页面仅限本机访问</h1>
-<p>为保护服务器上的 AI 密钥配置，设置页只在通过 <code>localhost</code> 或 <code>127.0.0.1</code> 访问时可用。</p>
+<h1>🔒 ${pageName}仅限本机访问</h1>
+<p>为保护服务器配置与访问统计，该页面只在通过 <code>localhost</code> 或 <code>127.0.0.1</code> 访问时可用。</p>
 <p>当前访问地址：<code>${safeHost}</code></p>
 <p><a href="/">← 返回填充工作台</a></p>
 </div></body></html>`;
 }
 
 app.use((req, res, next) => {
+  if (!isLocalOnlyPath(req.path)) return next();
+  // 登录页与登录接口本身放行，否则无法登录
+  if (req.path === '/admin-login.html' || req.path.startsWith('/api/admin/')) return next();
+  // 本机访问免登录
   if (isLocalRequest(req)) return next();
-  if (req.path === '/settings.html' || req.path.startsWith('/api/settings')) {
-    if (req.path === '/settings.html') {
-      return res.status(403).type('html').send(settingsDeniedHtml(req.headers.host));
+  // 远程但已登录（签名 cookie 有效）
+  if (adminAuth.hasSession(req)) return next();
+
+  // 未授权：页面跳登录页，接口返回 401
+  if (req.path === '/settings.html' || req.path === '/admin.html' || req.path === '/admin.html/') {
+    if (!adminAuth.isEnabled()) {
+      const name = req.path === '/settings.html' ? '设置页面' : '监控台';
+      return res.status(403).type('html').send(localizedDeniedHtml(req.headers.host, name));
     }
-    return res.status(403).json({ error: '设置接口仅限本机访问' });
+    const nextPath = req.originalUrl || req.path;
+    return res.redirect(302, `/admin-login.html?next=${encodeURIComponent(nextPath)}`);
   }
-  next();
+  return res.status(401).json({ error: '未登录或会话已过期', needLogin: true, loginPath: '/admin-login.html' });
 });
 
 app.use(express.json({ limit: '2mb' }));
@@ -65,6 +86,8 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use(fillRoutes);
 app.use(kbRoutes);
 app.use(settingsRoutes);
+app.use(metricsRoutes);
+app.use(adminAuthRoutes);
 
 // 健康检查（供 Nginx / 监控探活）
 app.get('/api/health', (req, res) => {

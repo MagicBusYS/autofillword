@@ -1,0 +1,11 @@
+# 统一换行符，避免 Windows 下提交的 CRLF 破坏 Linux 上的脚本/unit 文件
+* text=auto
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.service text eol=lf
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf

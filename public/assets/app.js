@@ -205,11 +205,11 @@
     fetch('/api/jobs/' + state.jobId + '/apply', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: values }),
+      body: JSON.stringify({ values: values, vid: (window.getVisitorId ? window.getVisitorId() : "") }),
     }).then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error); return d; }); })
       .then(function (data) {
         els.doneText.textContent = '已填充 ' + data.appliedCount + ' 个字段，文件已生成。';
-        els.btnDownload.href = '/api/jobs/' + state.jobId + '/download';
+        els.btnDownload.href = '/api/jobs/' + state.jobId + '/download' + (window.getVisitorId ? '?vid=' + encodeURIComponent(window.getVisitorId()) : '');
         show(els.stepDone);
       })
       .catch(function (err) { alert('生成失败：' + err.message); })

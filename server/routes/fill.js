@@ -9,6 +9,7 @@ const crypto = require('crypto');
 
 const storageSvc = require('../services/storage');
 const fill = require('../services/fill');
+const metrics = require('../services/metrics');
 
 const router = express.Router();
 
@@ -88,9 +89,16 @@ router.get('/api/jobs/:id', (req, res) => {
 // 确认写回
 router.post('/api/jobs/:id/apply', express.json({ limit: '2mb' }), async (req, res) => {
   try {
-    const { values } = req.body || {};
+    const { values, vid } = req.body || {};
     if (!Array.isArray(values)) return res.status(400).json({ error: 'values 必须是数组' });
     const result = await fill.applyJob(req.params.id, values);
+    // 统计：完成自动填充的文件数（不记录文件名内容）
+    metrics.recordAction('fill', {
+      vid,
+      ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : (req.socket && req.socket.remoteAddress),
+      ua: req.headers['user-agent'],
+      fileName: result.fileName,
+    });
     res.json({ ok: true, ...result });
   } catch (err) {
     console.error('[fill] 写回失败:', err);
@@ -109,6 +117,13 @@ router.get('/api/jobs/:id/download', (req, res) => {
       console.error('[fill] 下载失败:', err.message);
       return;
     }
+    // 统计：下载次数（下载成功才计）
+    metrics.recordAction('download', {
+      vid: req.query.vid,
+      ip: req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : (req.socket && req.socket.remoteAddress),
+      ua: req.headers['user-agent'],
+      fileName: job.fileName,
+    });
     // 下载完成后延迟删除结果文件，避免用户文档在服务器上长期留存
     const outPath = job.outputPath;
     setTimeout(() => storageSvc.safeRemove(outPath), 10 * 60 * 1000).unref();

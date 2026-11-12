@@ -16,6 +16,11 @@ Environment=PORT=3000
 Environment=HOST=127.0.0.1
 # 配置/缓存目录（升级代码时不会被覆盖）
 Environment=STORAGE_DIR=/var/lib/autofill
+# IP 归属地查询（地区统计用）；不允许外发 IP 时改成 off
+Environment=GEOIP=on
+# 管理密码等敏感配置放在单独文件（权限 600），见 DEPLOY.md
+# 文件内容示例：ADMIN_PASSWORD=你的强密码
+EnvironmentFile=-/etc/autofill.env
 
 ExecStart=/usr/bin/node /opt/autofill/server/index.js
 Restart=always

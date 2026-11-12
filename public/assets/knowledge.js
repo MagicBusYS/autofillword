@@ -283,6 +283,7 @@
 
     var fd = new FormData();
     fd.append('file', file);
+    if (window.getVisitorId) fd.append('vid', window.getVisitorId());
 
     fetch('/api/kb/learn', { method: 'POST', body: fd })
       .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error); return d; }); })

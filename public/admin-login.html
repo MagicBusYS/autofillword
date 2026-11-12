@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理登录 - 智能文档填充</title>
+<link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
+<meta name="theme-color" content="#2563eb">
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .login-card {
+    width: 100%; max-width: 400px; background: #fff;
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 32px; box-shadow: 0 12px 32px rgba(15,23,42,.08);
+  }
+  .login-logo { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+  .login-logo img { width: 26px; height: 26px; }
+  .login-title { font-size: 20px; font-weight: 700; margin: 14px 0 6px; }
+  .login-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 22px; line-height: 1.7; }
+  .login-card label { font-size: 13px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px; }
+  .login-card .btn { width: 100%; margin-top: 18px; padding: 11px; }
+  .msg { margin-top: 14px; font-size: 13px; }
+  .msg.error { color: #b91c1c; }
+  .msg.ok { color: #15803d; }
+  .foot { margin-top: 20px; font-size: 12px; color: #94a3b8; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="login-logo">
+    <img src="/assets/favicon.svg" alt="">智能文档填充
+  </div>
+  <div class="login-title">管理员登录</div>
+  <div class="login-desc">设置页与监控台受密码保护，仅管理员可访问。</div>
+
+  <form id="login-form" autocomplete="off">
+    <label for="password">管理密码</label>
+    <input type="password" id="password" name="password" placeholder="请输入管理密码" autocomplete="current-password" required>
+    <button class="btn" type="submit" id="btn-login">登录</button>
+  </form>
+  <div class="msg" id="msg"></div>
+
+  <div class="foot">
+    密码由服务器环境变量 <code>ADMIN_PASSWORD</code> 配置；忘记可在服务器上修改后重启服务。<br>
+    <a href="/" style="color:#2563eb;text-decoration:none;">← 返回填充工作台</a>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var form = document.getElementById('login-form');
+  var msg = document.getElementById('msg');
+  var btn = document.getElementById('btn-login');
+
+  function show(text, ok) {
+    msg.textContent = text;
+    msg.className = 'msg ' + (ok ? 'ok' : 'error');
+  }
+
+  // 已是本机或已登录，直接跳回目标页
+  fetch('/api/admin/status').then(function (r) { return r.json(); }).then(function (s) {
+    if (s.authorized) {
+      var next = new URLSearchParams(location.search).get('next') || '/admin.html';
+      if (!/^\/[^\/\\]/.test(next)) next = '/admin.html';
+      location.replace(next);
+    } else if (!s.enabled) {
+      show('服务器未配置管理密码（ADMIN_PASSWORD），请先在服务器上设置后重启服务。', false);
+      btn.disabled = true;
+    }
+  }).catch(function () {});
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var pw = document.getElementById('password').value;
+    if (!pw) { show('请输入密码', false); return; }
+    btn.disabled = true;
+    btn.textContent = '登录中…';
+    fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    }).then(function (r) { return r.json().then(function (d) { return { status: r.status, d: d }; }); })
+      .then(function (res) {
+        if (res.d && res.d.ok) {
+          show('登录成功，正在跳转…', true);
+          var next = new URLSearchParams(location.search).get('next') || '/admin.html';
+          if (!/^\/[^\/\\]/.test(next)) next = '/admin.html';
+          setTimeout(function () { location.replace(next); }, 300);
+        } else {
+          show((res.d && res.d.error) || '登录失败', false);
+          btn.disabled = false;
+          btn.textContent = '登录';
+        }
+      })
+      .catch(function (err) {
+        show('网络错误：' + err.message, false);
+        btn.disabled = false;
+        btn.textContent = '登录';
+      });
+  });
+})();
+</script>
+</body>
+</html>
